@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "start": "node client.js"
+  },
+  "dependencies": {
+    "axios": "^0.27.2",
+    "dotenv": "^16.0.1",
+    "fs": "^0.0.1-security",
+    "ws": "^8.8.0"
+  }
+}
