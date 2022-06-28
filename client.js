@@ -21,7 +21,7 @@ async function main() {
       },
     })
     .then((response) => {
-      const messages = response.data.messages;
+      const { messages } = response.data;
       messages.forEach((msg) => {
         const eachMsg = msg.message;
         alreadyInFile(eachMsg);
