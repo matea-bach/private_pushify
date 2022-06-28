@@ -3,30 +3,29 @@ require("dotenv").config();
 const axios = require("axios").default;
 const fs = require("fs");
 
-const url = process.env.URL;
-
 //Sending HTTP requests with Axios is as simple as giving an object to the axios() function that contains all of the configuration options and data
 //TODO:set intervals, now it waits and then logs messages like crazy instead having a wait time in between every message
 
-const { APPID_INTAKE, APPID_OUTPUT, APPID_DLQ, URL } = process.env;
+const { APPID_INTAKE, APPID_OUTPUT, APPID_DLQ, URL, TIMEOUT, TOKEN, FILE } =
+  process.env;
 
 async function main() {
   await axios
     .get(`${URL}/application/${APPID_INTAKE}/message`, {
-      timeout: process.env.TIMEOUT,
+      timeout: TIMEOUT,
       headers: {
         "Content-Type": "application/json",
-        "X-Gotify-Key": process.env.TOKEN,
+        "X-Gotify-Key": TOKEN,
         Connection: "Upgrade",
         Upgrade: "websocket",
       },
     })
     .then((response) => {
-      const listOfMessages = response.data.messages;
-      listOfMessages.forEach((msg) => {
+      const messages = response.data.messages;
+      messages.forEach((msg) => {
         const eachMsg = msg.message;
         alreadyInFile(eachMsg);
-        fs.appendFileSync("messages.txt", eachMsg + "\n", { flag: "a+" });
+        fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
       });
     })
     .catch((err) => {
@@ -36,7 +35,7 @@ async function main() {
 main();
 
 const alreadyInFile = function (msgBody) {
-  const data = fs.readFileSync("./messages.txt", { encoding: "utf8" });
+  const data = fs.readFileSync(FILE, { encoding: "utf8" });
   const eachLine = data.split(/\n/);
   for (const line of eachLine.entries()) {
     if (line[1] === msgBody) {
