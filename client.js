@@ -24,8 +24,11 @@ async function main() {
       const { messages } = response.data;
       messages.forEach((msg) => {
         const eachMsg = msg.message;
-        alreadyInFile(eachMsg);
-        fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
+        if (!alreadyInFile(eachMsg) && isValidURL(eachMsg)) {
+          fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
+        } else {
+          handleDLQ(eachMsg);
+        }
       });
     })
     .catch((err) => {
@@ -34,23 +37,37 @@ async function main() {
 }
 main();
 
+//checking for duplicates
 const alreadyInFile = function (msgBody) {
   const data = fs.readFileSync(FILE, { encoding: "utf8" });
   const eachLine = data.split(/\n/);
   for (const line of eachLine.entries()) {
     if (line[1] === msgBody) {
+      console.log(`Skipping message ${msgBody}`);
       return true;
     }
   }
   return false;
 };
-alreadyInFile();
 
-//Another (simpler) method would be to read the entire file into a buffer, convert it to a string, split the string on your line-terminator to produce an array of lines, and then iterate over the array, as in:
-// const buf = fs.readFileSync("./messages.txt");
-// buf
-//   .toString()
-//   .split(/\n/)
-//   .forEach(function (line) {
-//     console.log("BUF", line);
-//   });
+const isValidURL = function (url) {
+  const expression = /(http|https):\/\//;
+  const regex = new RegExp(expression);
+  if (url.match(regex)) {
+    return true;
+  }
+  console.log(`Isn't valid URL ${url}`);
+  return false;
+};
+
+//GOAL:If a message does not pass validation, it should be sent to the DLQ and removed from the input topic.
+
+const handleDLQ = function (message) {
+  axios
+    .post(`${URL}/message`)
+    .then((res) => {
+      console.log(message);
+      console.log(res.data);
+    })
+    .catch((err) => console.log(err));
+};
