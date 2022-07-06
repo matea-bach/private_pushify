@@ -2,7 +2,6 @@ const WebSocketClient = require("ws");
 require("dotenv").config();
 const axios = require("axios").default;
 const fs = require("fs");
-const { url } = require("inspector");
 
 //Sending HTTP requests with Axios is as simple as giving an object to the axios() function that contains all of the configuration options and data
 //TODO:set intervals, now it waits and then logs messages like crazy instead having a wait time in between every message
@@ -28,7 +27,7 @@ async function main() {
         if (!alreadyInFile(eachMsg) && isValidURL(eachMsg)) {
           fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
         } else {
-          // handleDLQ(eachMsg);
+          handleDLQ(eachMsg);
         }
       });
     })
@@ -63,12 +62,12 @@ const isValidURL = function (url) {
 
 //GOAL:If a message does not pass validation, it should be sent to the DLQ and removed from the input topic.
 
-// const handleDLQ = function (message) {
-//   axios
-//     .post(`${URL}/message`)
-//     .then((res) => {
-//       console.log(message);
-//       console.log(res.data);
-//     })
-//     .catch((err) => console.log(err));
-// };
+const handleDLQ = function (message) {
+  axios
+    .post(`${URL}/message`)
+    .then((res) => {
+      console.log(message);
+      console.log(res.data);
+    })
+    .catch((err) => console.log(err));
+};
