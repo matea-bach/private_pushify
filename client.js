@@ -34,13 +34,13 @@ async function main() {
       for (const msg of messages) {
         const eachMsg = msg.message;
         if (!isValidURL(eachMsg)) {
-          sendToDLQ(eachMsg);
+          sendMsg(eachMsg, DLQ_TOKEN);
           continue;
         }
         if (!alreadyInFile(eachMsg)) {
           fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
         }
-        sendToOutput(eachMsg);
+        sendMsg(eachMsg, OUTPUT_TOKEN);
       }
     })
     .catch((err) => {
@@ -72,30 +72,9 @@ const isValidURL = function (url) {
   return false;
 };
 
-//GOAL:If a message does not pass validation, it should be sent to the DLQ and removed from the input topic.
-
-const sendToDLQ = function (message) {
+const sendMsg = (message, token) => {
   axios
-    .post(
-      `${URL}/message`,
-      { message },
-      {
-        headers: {
-          "X-Gotify-Key": DLQ_TOKEN,
-        },
-      }
-    )
-    .then(console.log("POST", message))
-    .catch((err) => console.log(err));
-};
-
-const sendToOutput = function (message) {
-  axios
-    .post(
-      `${URL}/message`,
-      { message },
-      { headers: { "X-Gotify-Key": OUTPUT_TOKEN } }
-    )
-    .then(console.log("OUTPUT", message))
+    .post(`${URL}/message`, { message }, { headers: { "X-Gotify-Key": token } })
+    .then(console.log("sendMsg", message))
     .catch((err) => console.log(err));
 };
