@@ -6,8 +6,16 @@ const fs = require("fs");
 //Sending HTTP requests with Axios is as simple as giving an object to the axios() function that contains all of the configuration options and data
 //TODO:set intervals, now it waits and then logs messages like crazy instead having a wait time in between every message
 
-const { APPID_INTAKE, APPID_OUTPUT, APPID_DLQ, URL, TIMEOUT, TOKEN, FILE } =
-  process.env;
+const {
+  APPID_INTAKE,
+  APPID_OUTPUT,
+  APPID_DLQ,
+  URL,
+  TIMEOUT,
+  CLIENT_TOKEN,
+  FILE,
+  DLQ_TOKEN,
+} = process.env;
 
 async function main() {
   await axios
@@ -15,19 +23,23 @@ async function main() {
       timeout: TIMEOUT,
       headers: {
         "Content-Type": "application/json",
-        "X-Gotify-Key": TOKEN,
+        "X-Gotify-Key": CLIENT_TOKEN,
         Connection: "Upgrade",
         Upgrade: "websocket",
       },
     })
     .then((response) => {
       const { messages } = response.data;
+      let shouldSkip = false;
       messages.forEach((msg) => {
         const eachMsg = msg.message;
-        if (!alreadyInFile(eachMsg) && isValidURL(eachMsg)) {
-          fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
-        } else {
+        if (!isValidURL(eachMsg)) {
           handleDLQ(eachMsg);
+          shouldSkip = true;
+          return;
+        }
+        if (!alreadyInFile(eachMsg)) {
+          fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
         }
       });
     })
@@ -64,10 +76,15 @@ const isValidURL = function (url) {
 
 const handleDLQ = function (message) {
   axios
-    .post(`${URL}/message`)
-    .then((res) => {
-      console.log(message);
-      console.log(res.data);
-    })
+    .post(
+      `${URL}/message`,
+      { message },
+      {
+        headers: {
+          "X-Gotify-Key": DLQ_TOKEN,
+        },
+      }
+    )
+    .then(console.log("POST", message))
     .catch((err) => console.log(err));
 };
