@@ -33,6 +33,7 @@ async function main() {
       const { messages } = response.data;
       for (const msg of messages) {
         const eachMsg = msg.message;
+        const msgId = msg.id;
         if (!isValidURL(eachMsg)) {
           sendMsg(eachMsg, DLQ_TOKEN);
           continue;
@@ -41,11 +42,10 @@ async function main() {
           fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
         }
         sendMsg(eachMsg, OUTPUT_TOKEN);
+        deleteMsg(msgId);
       }
     })
-    .catch((err) => {
-      console.log(err.code);
-    });
+    .catch((err) => console.log(err.code));
 }
 main();
 
@@ -77,4 +77,21 @@ const sendMsg = (message, token) => {
     .post(`${URL}/message`, { message }, { headers: { "X-Gotify-Key": token } })
     .then(console.log("sendMsg", message))
     .catch((err) => console.log(err));
+};
+
+//GOAL:Remove processed messages from input application
+// After a message is processed, it should be deleted from the input queue.
+
+// "Processed" means any of the following:
+// 1. Saved to the output file
+// 2. Found to be a duplicate and skipped
+// 3. Found to be invalid and sent to the DLQ
+
+const deleteMsg = function (msgId) {
+  axios
+    .delete(`${URL}/messsage/:${16}`)
+    .then(console.log("Delete message with id:", msgId))
+    .catch((err) => {
+      console.log(err);
+    });
 };
