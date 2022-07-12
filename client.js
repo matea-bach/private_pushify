@@ -44,9 +44,7 @@ async function main() {
         deleteMsg(msg.id, CLIENT_TOKEN);
       }
     })
-    .catch((err) => {
-      console.log("Response error", err);
-    });
+    .catch((err) => console.log("Response error", err));
 }
 main();
 
