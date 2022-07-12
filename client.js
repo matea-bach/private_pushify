@@ -6,8 +6,17 @@ const fs = require("fs");
 //Sending HTTP requests with Axios is as simple as giving an object to the axios() function that contains all of the configuration options and data
 //TODO:set intervals, now it waits and then logs messages like crazy instead having a wait time in between every message
 
-const { APPID_INTAKE, APPID_OUTPUT, APPID_DLQ, URL, TIMEOUT, TOKEN, FILE } =
-  process.env;
+const {
+  APPID_INTAKE,
+  APPID_OUTPUT,
+  APPID_DLQ,
+  URL,
+  TIMEOUT,
+  FILE,
+  CLIENT_TOKEN,
+  OUTPUT_TOKEN,
+  DLQ_TOKEN,
+} = process.env;
 
 async function main() {
   await axios
@@ -15,25 +24,28 @@ async function main() {
       timeout: TIMEOUT,
       headers: {
         "Content-Type": "application/json",
-        "X-Gotify-Key": TOKEN,
+        "X-Gotify-Key": CLIENT_TOKEN,
         Connection: "Upgrade",
         Upgrade: "websocket",
       },
     })
     .then((response) => {
       const { messages } = response.data;
-      messages.forEach((msg) => {
+      for (const msg of messages) {
         const eachMsg = msg.message;
-        if (!alreadyInFile(eachMsg) && isValidURL(eachMsg)) {
-          fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
-        } else {
-          handleDLQ(eachMsg);
+        const msgId = msg.id;
+        if (!isValidURL(eachMsg)) {
+          sendMsg(eachMsg, DLQ_TOKEN);
+          continue;
         }
-      });
+        if (!alreadyInFile(eachMsg)) {
+          fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
+        }
+        sendMsg(eachMsg, OUTPUT_TOKEN);
+        deleteMsg(msgId);
+      }
     })
-    .catch((err) => {
-      console.log(err.response ? err.response.data : err);
-    });
+    .catch((err) => console.log(err.code));
 }
 main();
 
@@ -60,14 +72,26 @@ const isValidURL = function (url) {
   return false;
 };
 
-//GOAL:If a message does not pass validation, it should be sent to the DLQ and removed from the input topic.
-
-const handleDLQ = function (message) {
+const sendMsg = (message, token) => {
   axios
-    .post(`${URL}/message`)
-    .then((res) => {
-      console.log(message);
-      console.log(res.data);
-    })
+    .post(`${URL}/message`, { message }, { headers: { "X-Gotify-Key": token } })
+    .then(console.log("sendMsg", message))
     .catch((err) => console.log(err));
+};
+
+//GOAL:Remove processed messages from input application
+// After a message is processed, it should be deleted from the input queue.
+
+// "Processed" means any of the following:
+// 1. Saved to the output file
+// 2. Found to be a duplicate and skipped
+// 3. Found to be invalid and sent to the DLQ
+
+const deleteMsg = function (msgId) {
+  axios
+    .delete(`${URL}/messsage/:${16}`)
+    .then(console.log("Delete message with id:", msgId))
+    .catch((err) => {
+      console.log(err);
+    });
 };
