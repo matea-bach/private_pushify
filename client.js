@@ -8,14 +8,13 @@ const fs = require("fs");
 
 const {
   APPID_INTAKE,
-  APPID_OUTPUT,
-  APPID_DLQ,
   URL,
   TIMEOUT,
   FILE,
   CLIENT_TOKEN,
   OUTPUT_TOKEN,
   DLQ_TOKEN,
+  INTAKE_TOKEN,
 } = process.env;
 
 async function main() {
@@ -32,19 +31,21 @@ async function main() {
     .then((response) => {
       const { messages } = response.data;
       for (const msg of messages) {
-        const eachMsg = msg.message;
-        if (!isValidURL(eachMsg)) {
-          sendMsg(eachMsg, DLQ_TOKEN);
+        const msgBody = msg.message;
+        if (!isValidURL(msgBody)) {
+          sendMsg(msgBody, DLQ_TOKEN);
+          deleteMsg(msg.id, CLIENT_TOKEN);
           continue;
         }
-        if (!alreadyInFile(eachMsg)) {
-          fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
+        if (!alreadyInFile(msgBody)) {
+          fs.appendFileSync(FILE, msgBody + "\n", { flag: "a+" });
         }
-        sendMsg(eachMsg, OUTPUT_TOKEN);
+        sendMsg(msgBody, OUTPUT_TOKEN);
+        deleteMsg(msg.id, CLIENT_TOKEN);
       }
     })
     .catch((err) => {
-      console.log(err.code);
+      console.log("Response error", err);
     });
 }
 main();
@@ -76,5 +77,16 @@ const sendMsg = (message, token) => {
   axios
     .post(`${URL}/message`, { message }, { headers: { "X-Gotify-Key": token } })
     .then(console.log("sendMsg", message))
-    .catch((err) => console.log(err));
+    .catch((err) => console.log("fn sendMsg", err.response));
+};
+
+const deleteMsg = function (msgId, token) {
+  axios
+    .delete(`${URL}/message/${msgId}`, {
+      headers: { "X-Gotify-Key": token },
+    })
+    .then(console.log("Deleting message with id:", msgId))
+    .catch((err) => {
+      console.log("deleteMsg error", err.response.status);
+    });
 };
