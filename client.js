@@ -50,11 +50,24 @@ let socket = new WebSocket(`wss://push.4redbuttons.dev/stream`, {
   headers: { "X-Gotify-Key": CLIENT_TOKEN },
 });
 
-socket.on("open", function open() {
-  console.log("WEBSOCKET OPENED");
-});
+socket.onopen = (event) => {
+  console.log("Websocket connection opened", event.data);
+};
 
-//The stream endpoint is not included inside the api client because it is not definable via the swagger 2.0 specification. You can use any websocket client library to connect to the /stream endpoint with a client token.
+socket.onmessage = (event) => {
+  const message = event.data;
+  const messages = JSON.parse(message);
+  const msgBody = messages.message;
+  console.log("ONMESSAGE", msgBody);
+  if (!isValidURL(msgBody)) {
+    sendMsg(msgBody, DLQ_TOKEN);
+  }
+  sendMsg(msgBody, OUTPUT_TOKEN);
+};
+
+socket.onerror = (event) => {
+  console.log("Websocket error", event);
+};
 
 //checking for duplicates
 const alreadyInFile = function (msgBody) {
