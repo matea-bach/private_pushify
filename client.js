@@ -59,10 +59,13 @@ socket.onmessage = (event) => {
   const messages = JSON.parse(message);
   const msgBody = messages.message;
   console.log("ONMESSAGE", msgBody);
-  if (!isValidURL(msgBody)) {
-    sendMsg(msgBody, DLQ_TOKEN);
+  //if it's not the input queue go away
+  if (!event.data) {
+    if (!isValidURL(msgBody)) {
+      sendMsg(msgBody, DLQ_TOKEN);
+    }
+    sendMsg(msgBody, OUTPUT_TOKEN);
   }
-  sendMsg(msgBody, OUTPUT_TOKEN);
 };
 
 socket.onerror = (event) => {
