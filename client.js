@@ -55,14 +55,16 @@ socket.onopen = (event) => {
 };
 
 socket.onmessage = (event) => {
-  const message = event.data;
-  const messages = JSON.parse(message);
-  const msgBody = messages.message;
-  console.log("ONMESSAGE", msgBody);
-  //if it's not the input queue go away
-  if (!event.data) {
+  const message = JSON.parse(event.data);
+  console.log("ONMESSAGE", message);
+  console.log(message.appid, APPID_INTAKE);
+  if (message.appid.toString() === APPID_INTAKE) {
+    const msgBody = message.message;
     if (!isValidURL(msgBody)) {
       sendMsg(msgBody, DLQ_TOKEN);
+    }
+    if (!alreadyInFile(msgBody)) {
+      fs.appendFileSync(FILE, msgBody + "\n", { flag: "a+" });
     }
     sendMsg(msgBody, OUTPUT_TOKEN);
   }
@@ -109,6 +111,6 @@ const deleteMsg = function (msgId, token) {
     })
     .then(console.log("Deleting message with id:", msgId))
     .catch((err) => {
-      console.log("deleteMsg error", err.response);
+      console.log("deleteMsg error");
     });
 };
