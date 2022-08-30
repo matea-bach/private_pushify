@@ -1,10 +1,8 @@
 const WebSocket = require("ws");
-require("dotenv").config();
 const axios = require("axios").default;
 const fs = require("fs");
 
-//Sending HTTP requests with Axios is as simple as giving an object to the axios() function that contains all of the configuration options and data
-//TODO:set intervals, now it waits and then logs messages like crazy instead having a wait time in between every message
+require("dotenv").config();
 
 const {
   APPID_INTAKE,
@@ -17,61 +15,34 @@ const {
   INTAKE_TOKEN,
 } = process.env;
 
-async function main() {
-  await axios
-    .get(`${URL}/stream`, {
-      timeout: TIMEOUT,
-      headers: {
-        "Content-Type": "application/json",
-        "X-Gotify-Key": CLIENT_TOKEN,
-      },
-    })
-    .then((response) => {
-      const { messages } = response.data;
-      for (const msg of messages) {
-        const msgBody = msg.message;
-        if (!isValidURL(msgBody)) {
-          sendMsg(msgBody, DLQ_TOKEN);
-          deleteMsg(msg.id, CLIENT_TOKEN);
-          continue;
-        }
-        if (!alreadyInFile(msgBody)) {
-          fs.appendFileSync(FILE, msgBody + "\n", { flag: "a+" });
-        }
-        sendMsg(msgBody, OUTPUT_TOKEN);
-        deleteMsg(msg.id, CLIENT_TOKEN);
-      }
-    })
-    .catch((err) => console.log("CATCH Response error", err.response));
-}
-// main();
-
 let socket = new WebSocket(`wss://push.4redbuttons.dev/stream`, {
   headers: { "X-Gotify-Key": CLIENT_TOKEN },
 });
 
 socket.onopen = (event) => {
-  console.log("Websocket connection opened", event.data);
+  console.log("Websocket connection opened:", event.data);
 };
 
 socket.onmessage = (event) => {
   const message = JSON.parse(event.data);
-  console.log("ONMESSAGE", message);
-  console.log(message.appid, APPID_INTAKE);
+  console.log("Message received:", message);
   if (message.appid.toString() === APPID_INTAKE) {
     const msgBody = message.message;
     if (!isValidURL(msgBody)) {
       sendMsg(msgBody, DLQ_TOKEN);
+      deleteMsg(message.id, CLIENT_TOKEN);
+      return;
     }
     if (!alreadyInFile(msgBody)) {
       fs.appendFileSync(FILE, msgBody + "\n", { flag: "a+" });
     }
     sendMsg(msgBody, OUTPUT_TOKEN);
+    deleteMsg(message.id, CLIENT_TOKEN);
   }
 };
 
 socket.onerror = (event) => {
-  console.log("Websocket error", event);
+  console.log("Websocket error:", event);
 };
 
 //checking for duplicates
@@ -80,7 +51,7 @@ const alreadyInFile = function (msgBody) {
   const eachLine = data.split(/\n/);
   for (const line of eachLine.entries()) {
     if (line[1] === msgBody) {
-      console.log(`Skipping message ${msgBody}`);
+      console.log(`Skipping message: ${msgBody}`);
       return true;
     }
   }
@@ -99,18 +70,22 @@ const isValidURL = function (url) {
 
 const sendMsg = (message, token) => {
   axios
-    .post(`${URL}/message`, { message }, { headers: { "X-Gotify-Key": token } })
+    .post(
+      `https://${URL}/message`,
+      { message },
+      { headers: { "X-Gotify-Key": token } }
+    )
     .then(console.log("sendMsg", message))
-    .catch((err) => console.log("fn sendMsg", err.response));
+    .catch((err) => console.log("Error sending message:", err));
 };
 
 const deleteMsg = function (msgId, token) {
   axios
-    .delete(`${URL}/message/${msgId}`, {
+    .delete(`https://${URL}/message/${msgId}`, {
       headers: { "X-Gotify-Key": token },
     })
     .then(console.log("Deleting message with id:", msgId))
     .catch((err) => {
-      console.log("deleteMsg error");
+      console.log("Error deleting message:", err);
     });
 };
