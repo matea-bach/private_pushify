@@ -15,7 +15,7 @@ const {
   INTAKE_TOKEN,
 } = process.env;
 
-let socket = new WebSocket(`wss://push.4redbuttons.dev/stream`, {
+let socket = new WebSocket(`wss://${URL}/stream`, {
   headers: { "X-Gotify-Key": CLIENT_TOKEN },
 });
 
