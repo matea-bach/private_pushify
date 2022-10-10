@@ -4,16 +4,8 @@ const fs = require("fs");
 
 require("dotenv").config();
 
-const {
-  APPID_INTAKE,
-  URL,
-  TIMEOUT,
-  FILE,
-  CLIENT_TOKEN,
-  OUTPUT_TOKEN,
-  DLQ_TOKEN,
-  INTAKE_TOKEN,
-} = process.env;
+const { APPID_INTAKE, URL, FILE, CLIENT_TOKEN, OUTPUT_TOKEN, DLQ_TOKEN } =
+  process.env;
 
 let socket = new WebSocket(`wss://${URL}/stream`, {
   headers: { "X-Gotify-Key": CLIENT_TOKEN },
