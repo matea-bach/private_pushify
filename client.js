@@ -75,7 +75,7 @@ const sendMsg = (message, token) => {
       { message },
       { headers: { "X-Gotify-Key": token } }
     )
-    .then(console.log("sendMsg", message))
+    .then(console.log("Sending message:", message))
     .catch((err) => console.log("Error sending message:", err));
 };
 
