@@ -1,53 +1,41 @@
-const WebSocketClient = require("ws");
-require("dotenv").config();
+const WebSocket = require("ws");
 const axios = require("axios").default;
 const fs = require("fs");
 
-//Sending HTTP requests with Axios is as simple as giving an object to the axios() function that contains all of the configuration options and data
-//TODO:set intervals, now it waits and then logs messages like crazy instead having a wait time in between every message
+require("dotenv").config();
 
-const {
-  APPID_INTAKE,
-  APPID_OUTPUT,
-  APPID_DLQ,
-  URL,
-  TIMEOUT,
-  FILE,
-  CLIENT_TOKEN,
-  OUTPUT_TOKEN,
-  DLQ_TOKEN,
-} = process.env;
+const { APPID_INTAKE, URL, FILE, CLIENT_TOKEN, OUTPUT_TOKEN, DLQ_TOKEN } =
+  process.env;
 
-async function main() {
-  await axios
-    .get(`${URL}/application/${APPID_INTAKE}/message`, {
-      timeout: TIMEOUT,
-      headers: {
-        "Content-Type": "application/json",
-        "X-Gotify-Key": CLIENT_TOKEN,
-        Connection: "Upgrade",
-        Upgrade: "websocket",
-      },
-    })
-    .then((response) => {
-      const { messages } = response.data;
-      for (const msg of messages) {
-        const eachMsg = msg.message;
-        const msgId = msg.id;
-        if (!isValidURL(eachMsg)) {
-          sendMsg(eachMsg, DLQ_TOKEN);
-          continue;
-        }
-        if (!alreadyInFile(eachMsg)) {
-          fs.appendFileSync(FILE, eachMsg + "\n", { flag: "a+" });
-        }
-        sendMsg(eachMsg, OUTPUT_TOKEN);
-        deleteMsg(msgId);
-      }
-    })
-    .catch((err) => console.log(err.code));
-}
-main();
+let socket = new WebSocket(`wss://${URL}/stream`, {
+  headers: { "X-Gotify-Key": CLIENT_TOKEN },
+});
+
+socket.onopen = (event) => {
+  console.log("Websocket connection opened:", event.data);
+};
+
+socket.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  console.log("Message received:", message);
+  if (message.appid.toString() === APPID_INTAKE) {
+    const msgBody = message.message;
+    if (!isValidURL(msgBody)) {
+      sendMsg(msgBody, DLQ_TOKEN);
+      deleteMsg(message.id, CLIENT_TOKEN);
+      return;
+    }
+    if (!alreadyInFile(msgBody)) {
+      fs.appendFileSync(FILE, msgBody + "\n", { flag: "a+" });
+    }
+    sendMsg(msgBody, OUTPUT_TOKEN);
+    deleteMsg(message.id, CLIENT_TOKEN);
+  }
+};
+
+socket.onerror = (event) => {
+  console.log("Websocket error:", event);
+};
 
 //checking for duplicates
 const alreadyInFile = function (msgBody) {
@@ -55,7 +43,7 @@ const alreadyInFile = function (msgBody) {
   const eachLine = data.split(/\n/);
   for (const line of eachLine.entries()) {
     if (line[1] === msgBody) {
-      console.log(`Skipping message ${msgBody}`);
+      console.log(`Skipping message: ${msgBody}`);
       return true;
     }
   }
@@ -74,24 +62,22 @@ const isValidURL = function (url) {
 
 const sendMsg = (message, token) => {
   axios
-    .post(`${URL}/message`, { message }, { headers: { "X-Gotify-Key": token } })
-    .then(console.log("sendMsg", message))
-    .catch((err) => console.log(err));
+    .post(
+      `https://${URL}/message`,
+      { message },
+      { headers: { "X-Gotify-Key": token } }
+    )
+    .then(console.log("Sending message:", message))
+    .catch((err) => console.log("Error sending message:", err));
 };
 
-//GOAL:Remove processed messages from input application
-// After a message is processed, it should be deleted from the input queue.
-
-// "Processed" means any of the following:
-// 1. Saved to the output file
-// 2. Found to be a duplicate and skipped
-// 3. Found to be invalid and sent to the DLQ
-
-const deleteMsg = function (msgId) {
+const deleteMsg = function (msgId, token) {
   axios
-    .delete(`${URL}/messsage/:${16}`)
-    .then(console.log("Delete message with id:", msgId))
+    .delete(`https://${URL}/message/${msgId}`, {
+      headers: { "X-Gotify-Key": token },
+    })
+    .then(console.log("Deleting message with id:", msgId))
     .catch((err) => {
-      console.log(err);
+      console.log("Error deleting message:", err);
     });
 };
